@@ -28,6 +28,8 @@
  * Unlike "struct cpuinfo_x86.x86_capability", kvm_cpu_caps doesn't need to be
  * aligned to sizeof(unsigned long) because it's not accessed via bitops.
  */
+u32 exits, exits_per_reason[62] ;
+void add_exit_per_reason(u32 exit_reason);
 u32 kvm_cpu_caps[NCAPINTS] __read_mostly;
 EXPORT_SYMBOL_GPL(kvm_cpu_caps);
 
@@ -1102,17 +1104,47 @@ EXPORT_SYMBOL_GPL(kvm_cpuid);
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
 	u32 eax, ebx, ecx, edx;
-
 	if (cpuid_fault_enabled(vcpu) && !kvm_require_cpl(vcpu, 0))
 		return 1;
-
 	eax = kvm_rax_read(vcpu);
 	ecx = kvm_rcx_read(vcpu);
-	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, false);
+	if(eax  ==  0x4fffffff)
+	{
+	    eax = exits;
+	}
+	else if(eax  ==  0x4ffffffd)
+	{
+       if(ecx >= 0 && ecx < 62)
+	{
+		eax = exits_per_reason[(int)ecx];
+
+	}
+	}
+	else
+	{
+	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+	}
 	kvm_rax_write(vcpu, eax);
 	kvm_rbx_write(vcpu, ebx);
 	kvm_rcx_write(vcpu, ecx);
 	kvm_rdx_write(vcpu, edx);
 	return kvm_skip_emulated_instruction(vcpu);
 }
+
+
+/*
+Function to get the exit reasons
+*/
+void add_exit_per_reason(u32 exit_reason)
+{
+   if(exit_reason >= 0 && exit_reason < 62)
+   {
+       exits++;
+       exits_per_reason[(int)exit_reason]++;
+
+   }
+
+}
+
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
+EXPORT_SYMBOL_GPL(add_exit_per_reason);
